@@ -1,0 +1,15 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "tradingview": {
+      "type": "local",
+      "command": ["uv", "run", "--directory", "C:\\Users\\I047787\\Documents\\project\\tradingview-mcp", "tradingview-mcp"],
+      "enabled": true
+    },
+    "ibkr": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8000/mcp",
+      "enabled": true
+    }
+  }
+}

@@ -28,6 +28,7 @@ from tradingview_mcp.core.services.screener_service import (
     scan_advanced_candle_patterns_single_tf,
     fetch_multi_timeframe_patterns,
     run_multi_timeframe_analysis,
+    analyze_fibonacci,
 )
 from tradingview_mcp.core.services.scanner_service import (
     volume_breakout_scan,
@@ -522,18 +523,34 @@ def egx_trade_plan(symbol: str, timeframe: str = "1D") -> dict:
     return generate_egx_trade_plan(symbol, timeframe)
 
 
-@mcp.tool(annotations=ToolAnnotations(title="EGX Fibonacci Retracement", readOnlyHint=True, destructiveHint=False, openWorldHint=True))
-def egx_fibonacci_retracement(symbol: str, lookback: str = "52W", timeframe: str = "1D") -> dict:
-    """Fibonacci retracement analysis for EGX stocks.
+# @mcp.tool(annotations=ToolAnnotations(title="EGX Fibonacci Retracement", readOnlyHint=True, destructiveHint=False, openWorldHint=True))
+# def egx_fibonacci_retracement(symbol: str, lookback: str = "52W", timeframe: str = "1D") -> dict:
+#     """Fibonacci retracement analysis for EGX stocks.
+#
+#     Args:
+#         symbol: EGX stock symbol (e.g., "COMI", "TMGH", "FWRY")
+#         lookback: Period for swing high/low — "1M", "3M", "6M", "52W", "ALL" (default 52W)
+#         timeframe: Analysis timeframe (5m, 15m, 1h, 4h, 1D, 1W, 1M — default 1D)
+#     """
+#     timeframe = sanitize_timeframe(timeframe, "1D")
+#     lookback = lookback.strip().upper()
+#     return analyze_egx_fibonacci(symbol, lookback, timeframe)
+
+
+@mcp.tool(annotations=ToolAnnotations(title="Fibonacci Retracement", readOnlyHint=True, destructiveHint=False, openWorldHint=True))
+def fibonacci_retracement(symbol: str, exchange: str = "KUCOIN", lookback: str = "52W", timeframe: str = "1D") -> dict:
+    """Fibonacci retracement analysis for any stock or crypto symbol.
 
     Args:
-        symbol: EGX stock symbol (e.g., "COMI", "TMGH", "FWRY")
+        symbol: Bare ticker, no exchange prefix — crypto: "BTCUSDT"; stocks: "COMI" (EGX), "THYAO" (BIST), "600519" (SSE), "300251" (SZSE), "2330" (TWSE), "3105" (TPEX), "GDX" (AMEX)
+        exchange: Exchange — crypto: KUCOIN, BINANCE, MEXC; stocks: EGX, BIST, NASDAQ, NYSE, AMEX, NYSEARCA, PCX, SSE, SZSE, TWSE, TPEX
         lookback: Period for swing high/low — "1M", "3M", "6M", "52W", "ALL" (default 52W)
         timeframe: Analysis timeframe (5m, 15m, 1h, 4h, 1D, 1W, 1M — default 1D)
     """
+    exchange = sanitize_exchange(exchange, "KUCOIN")
     timeframe = sanitize_timeframe(timeframe, "1D")
     lookback = lookback.strip().upper()
-    return analyze_egx_fibonacci(symbol, lookback, timeframe)
+    return analyze_fibonacci(symbol, exchange, lookback, timeframe)
 
 
 # ── Multi-timeframe analysis ───────────────────────────────────────────────────

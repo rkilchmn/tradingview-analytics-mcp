@@ -28,8 +28,8 @@ from tradingview_mcp.core.types import (
     percent_change, tf_to_tv_resolution,
 )
 from tradingview_mcp.core.services.coinlist import exchanges_listing_symbol, load_symbols
-from tradingview_mcp.core.services.indicators import compute_metrics
-from tradingview_mcp.core.utils.validators import EXCHANGE_SCREENER, get_market_type
+from tradingview_mcp.core.services.indicators import compute_metrics, compute_fibonacci_levels, analyze_fibonacci_position, detect_trend_for_fibonacci
+from tradingview_mcp.core.utils.validators import EXCHANGE_SCREENER, get_market_type, normalize_tradingview_symbol, resolve_screener_for_symbol, sanitize_timeframe
 
 # Resilience layer (does not require tradingview_ta; safe to import unconditionally).
 from tradingview_mcp.core.services.screener_provider import _scan_with_retry, humanize_upstream_error
@@ -1187,4 +1187,175 @@ def run_multi_timeframe_analysis(
                 "Never trade against Weekly + Daily combined direction",
             ],
         },
+    }
+
+
+def analyze_fibonacci(
+    symbol: str,
+    exchange: str,
+    lookback: str = "52W",
+    timeframe: str = "1D",
+) -> dict:
+    """
+    Generalized Fibonacci retracement analysis for any stock or crypto symbol.
+
+    Args:
+        symbol:    Bare ticker or ``EXCHANGE:SYMBOL`` form.
+        exchange:  Validated exchange identifier (e.g. ``egx``, ``nasdaq``,
+                   ``bist``, ``kucoin``).
+        lookback:  Period for swing high/low — '1M', '3M', '6M', '52W', 'ALL'.
+        timeframe: TradingView interval (default '1D').
+
+    Returns:
+        Fibonacci retracement & extension levels, price position, and context.
+    """
+    if not _TA_AVAILABLE:
+        return {"error": "tradingview_ta is missing; run `uv sync`."}
+
+    valid_lookbacks = {"1M", "3M", "6M", "52W", "ALL"}
+    if lookback not in valid_lookbacks:
+        return {"error": f"Invalid lookback: {lookback}", "valid": sorted(valid_lookbacks)}
+
+    full_symbol = normalize_tradingview_symbol(symbol, exchange)
+    screener = resolve_screener_for_symbol(full_symbol, exchange)
+
+    LOOKBACK_COLUMNS = {
+        "1M": ("High.1M", "Low.1M"),
+        "3M": ("High.3M", "Low.3M"),
+        "6M": ("High.6M", "Low.6M"),
+        "52W": ("price_52_week_high", "price_52_week_low"),
+        "ALL": ("High.All", "Low.All"),
+    }
+
+    swing_high: Optional[float] = None
+    swing_low: Optional[float] = None
+    swing_source: Optional[str] = None
+
+    if _SCREENER_AVAILABLE:
+        try:
+            high_col, low_col = LOOKBACK_COLUMNS[lookback]
+            q = (
+                Query()
+                .set_markets(screener)
+                .select("close", high_col, low_col)
+                .set_tickers([full_symbol])
+            )
+            fib_cache_key = (f"fib_swing_v1", full_symbol, lookback)
+            _, df = _scan_with_retry(q, cache_key=fib_cache_key)
+            if not df.empty:
+                row = df.iloc[0]
+                h = row.get(high_col)
+                ll = row.get(low_col)
+                if h is not None and ll is not None and h > ll:
+                    swing_high = float(h)
+                    swing_low = float(ll)
+                    swing_source = f"screener ({lookback} period high/low)"
+        except Exception:
+            pass
+
+    try:
+        analysis = get_multiple_analysis(screener=screener, interval=timeframe, symbols=[full_symbol])
+    except Exception as exc:
+        return {"error": f"Analysis failed: {exc}"}
+
+    if full_symbol not in analysis or analysis[full_symbol] is None:
+        return {"error": f"No data found for {full_symbol}"}
+
+    ind = analysis[full_symbol].indicators
+    if ind.get("ATR") is None:
+        from tradingview_mcp.core.services.screener_provider import fetch_atr_for_ticker
+        atr_value = fetch_atr_for_ticker(full_symbol, screener, timeframe)
+        if atr_value is not None:
+            ind["ATR"] = atr_value
+    close = ind.get("close")
+    if not close:
+        return {"error": f"No price data for {full_symbol}"}
+
+    if swing_high is None or swing_low is None:
+        fib_r3 = ind.get("Pivot.M.Fibonacci.R3")
+        fib_s3 = ind.get("Pivot.M.Fibonacci.S3")
+        classic_r3 = ind.get("Pivot.M.Classic.R3")
+        classic_s3 = ind.get("Pivot.M.Classic.S3")
+        h_candidate = fib_r3 or classic_r3
+        l_candidate = fib_s3 or classic_s3
+        if h_candidate and l_candidate and h_candidate > l_candidate:
+            swing_high = float(h_candidate)
+            swing_low = float(l_candidate)
+            swing_source = "pivot points (R3/S3 fallback)"
+        else:
+            return {
+                "error": "Could not determine swing high/low for Fibonacci calculation",
+                "hint": "Period high/low data not available for this symbol",
+            }
+
+    swing_range_pct = ((swing_high - swing_low) / swing_low) * 100
+    if swing_range_pct < 2:
+        return {
+            "error": f"Swing range too narrow ({swing_range_pct:.1f}%) for meaningful Fibonacci levels",
+            "swing_high": round(swing_high, 2),
+            "swing_low": round(swing_low, 2),
+        }
+
+    ema50 = ind.get("EMA50")
+    ema200 = ind.get("EMA200")
+    trend, trend_reasoning = detect_trend_for_fibonacci(close, swing_high, swing_low, ema50, ema200)
+    fib_levels = compute_fibonacci_levels(swing_high, swing_low, trend)
+    position = analyze_fibonacci_position(close, fib_levels)
+
+    rsi_val = ind.get("RSI")
+    atr_val = ind.get("ATR")
+    vol = ind.get("volume")
+    vol_sma = ind.get("volume.SMA20")
+    vol_ratio = round(vol / vol_sma, 2) if vol and vol_sma and vol_sma > 0 else None
+    change_pct = (
+        round(((close - ind.get("open", close)) / ind.get("open", close)) * 100, 2)
+        if ind.get("open")
+        else None
+    )
+
+    interp_parts = [
+        f"Price is at {position['retracement_depth_pct']}% retracement of the {trend}."
+    ]
+    if position.get("key_zone"):
+        interp_parts.append(f"Currently in {position['key_zone']}.")
+    if position.get("fib_supports"):
+        nearest_s = position["fib_supports"][0]
+        interp_parts.append(f"Key Fib support at {nearest_s['price']} ({nearest_s['ratio']}).")
+    if position.get("fib_resistances"):
+        nearest_r = position["fib_resistances"][0]
+        interp_parts.append(f"Key Fib resistance at {nearest_r['price']} ({nearest_r['ratio']}).")
+
+    sector = "N/A"
+    try:
+        from tradingview_mcp.core.data.egx_sectors import get_sector
+        if full_symbol.startswith("EGX:"):
+            sector = get_sector(full_symbol)
+    except Exception:
+        pass
+
+    return {
+        "symbol": full_symbol,
+        "sector": sector,
+        "timeframe": timeframe,
+        "lookback_period": lookback,
+        "price": round(close, 2),
+        "change_pct": change_pct,
+        "swing_high": round(swing_high, 2),
+        "swing_low": round(swing_low, 2),
+        "swing_range_pct": round(swing_range_pct, 1),
+        "swing_source": swing_source,
+        "trend": trend,
+        "trend_reasoning": trend_reasoning,
+        "retracement_levels": fib_levels["retracement_levels"],
+        "extension_levels": fib_levels["extension_levels"],
+        "price_position": position,
+        "context": {
+            "rsi": round(rsi_val, 1) if rsi_val else None,
+            "ema50": round(ema50, 2) if ema50 else None,
+            "ema200": round(ema200, 2) if ema200 else None,
+            "atr": round(atr_val, 2) if atr_val else None,
+            "volume_ratio": vol_ratio,
+        },
+        "interpretation": " ".join(interp_parts),
+        "disclaimer": "For educational/informational purposes only. Not financial advice.",
     }
