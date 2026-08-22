@@ -6,6 +6,11 @@
       "command": ["uv", "run", "--directory", "C:\\Users\\I047787\\Documents\\project\\tradingview-mcp", "tradingview-mcp"],
       "enabled": true
     },
+    "tradingview-control": {
+      "type": "local",
+      "command": ["node", "C:\\Users\\I047787\\Documents\\project\\tradingview-control-mcp\\src\\server.js"],
+      "enabled": true
+    },
     "ibkr": {
       "type": "remote",
       "url": "http://127.0.0.1:8000/mcp",
