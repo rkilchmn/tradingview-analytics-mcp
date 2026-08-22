@@ -51,11 +51,13 @@ where = ["src"]
 tradingview_mcp = ["coinlist/*.txt"]
 
 [tool.uv]
-dev-dependencies = [
+package = true
+
+[dependency-groups]
+dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
 ]
-package = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
