@@ -1,20 +1,21 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
   "mcp": {
-    "tradingview": {
+    "tradingview-analytics-stdio": {
       "type": "local",
-      "command": ["uv", "run", "--directory", "C:\\Users\\I047787\\Documents\\project\\tradingview-mcp", "tradingview-mcp"],
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        ".",
+        "tradingview-mcp"
+      ],
       "enabled": true
     },
-    "tradingview-control": {
-      "type": "local",
-      "command": ["node", "C:\\Users\\I047787\\Documents\\project\\tradingview-control-mcp\\src\\server.js"],
-      "enabled": true
-    },
-    "ibkr": {
+    "tradingview-analytics-sse": {
       "type": "remote",
-      "url": "http://127.0.0.1:8000/mcp",
+      "url": "http://127.0.0.1:8001/sse",
       "enabled": true
-    }
+    },
   }
 }

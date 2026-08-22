@@ -1111,7 +1111,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="TradingView Screener MCP server")
     parser.add_argument(
         "transport",
-        choices=["stdio", "streamable-http"],
+        choices=["stdio", "sse", "streamable-http"],
         default="stdio",
         nargs="?",
         help="Transport (default stdio)",
@@ -1132,7 +1132,7 @@ def main() -> None:
             mcp.settings.port = args.port
         except Exception:
             pass
-        mcp.run(transport="streamable-http")
+        mcp.run(transport=args.transport)
 
 
 if __name__ == "__main__":
