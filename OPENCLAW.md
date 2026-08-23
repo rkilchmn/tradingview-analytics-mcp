@@ -22,6 +22,8 @@ After setup, you can send messages like:
 
 You don't need to configure `mcpServers` inside OpenClaw. Instead, we use a lightweight `trading.py` wrapper that acts as a bridge between the OpenClaw agent and the `tradingview-mcp` library.
 
+> **Alternative:** If you prefer to run the full MCP server remotely and let OpenClaw connect over HTTP, start it with `uv run tradingview-mcp sse --host 0.0.0.0 --port 8000` and point OpenClaw at `http://<host>:8000/sse`. The wrapper approach below is simpler because it bypasses the MCP protocol and calls the analysis libraries directly.
+
 ### 1. Install Dependencies
 
 ```bash

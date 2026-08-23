@@ -131,8 +131,8 @@ https://github-production-user-asset-6210df.s3.amazonaws.com/67838093/478689497-
 **Two ways to run it — the same 37 tools either way:**
 
 | | 🧑‍💻 Self-host (this repo) | ☁️ Hosted — [pro.cryptosieve.com](https://pro.cryptosieve.com) |
-|---|---|---|
-| **Price** | Free forever (MIT) | $9/mo Pro · $29/mo Pro+ · 3-day trial |
+|---|---|
+| **Price** | Free forever (MIT) | $9/mo Pro · $29/mo Pro+ · 3-day free trial |
 | **Time to first call** | ~5 minutes (Python + `uv`) | ~60 seconds (paste one URL) |
 | **Updates & ops** | You run and update it | Managed — always on the latest |
 | **Runs on** | Your machine or VPS | Hosted, streamed from the edge |
@@ -140,6 +140,40 @@ https://github-production-user-asset-6210df.s3.amazonaws.com/67838093/478689497-
 | **Best for** | Tinkerers, forkers, full control | Folks who'd rather skip the ops |
 
 > ☁️ **Zero setup:** paste one connector URL into Claude.ai, ChatGPT, Copilot, or Cursor → **[start a 3-day free trial](https://pro.cryptosieve.com)**. Everything below is for self-hosting.
+
+## 🚀 Transports
+
+This server supports three MCP transports. Pick the one that matches your client:
+
+| Transport | When to use |
+|-----------|-------------|
+| **stdio** (default) | Claude Desktop, Codex, and any local MCP client that spawns the server as a child process. |
+| **sse** | Remote clients or reverse-proxied setups where the server must expose an HTTP endpoint with Server-Sent Events. |
+| **streamable-http** | Same as SSE but uses HTTP streaming; useful when the client prefers plain HTTP response bodies over event streams. |
+
+### stdio (default)
+
+```bash
+uv run tradingview-mcp
+```
+
+### SSE
+
+```bash
+uv run tradingview-mcp sse --host 0.0.0.0 --port 8000
+```
+
+Then point your client at `http://<host>:8000/sse`.
+
+### streamable-http
+
+```bash
+uv run tradingview-mcp streamable-http --host 0.0.0.0 --port 8000
+```
+
+Then point your client at `http://<host>:8000/mcp`.
+
+> **Note:** `--host` and `--port` default to `127.0.0.1:8000`. Set `HOST` / `PORT` environment variables to override defaults without flags.
 
 ### Install via pip
 ```bash

@@ -136,7 +136,27 @@ After adding the configuration:
 2. **Restart the application**
 3. **Wait for initialization** (first startup may take 30-60 seconds)
 
-### 4. Verify Installation
+### 4. Remote / HTTP transports (SSE / streamable-http)
+
+If you need the server reachable over HTTP — for example when a client cannot
+spawn a local process — start it with an explicit transport:
+
+```bash
+# SSE
+uv run tradingview-mcp sse --host 0.0.0.0 --port 8000
+
+# streamable-http
+uv run tradingview-mcp streamable-http --host 0.0.0.0 --port 8000
+```
+
+Then configure your client to connect to the server URL:
+
+- SSE endpoint: `http://<host>:8000/sse`
+- streamable-http endpoint: `http://<host>:8000/mcp`
+
+`HOST` and `PORT` can also be set via environment variables instead of flags.
+
+### 5. Verify Installation
 
 Ask Claude:
 ```
